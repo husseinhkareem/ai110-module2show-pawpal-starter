@@ -1,15 +1,60 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
-    %% Keep this file updated so it matches your final implementation.
+    %% PawPal+ final design: matches the finished pawpal_system.py,
+    %% including bonus algorithms, persistence, and formatting helpers.
 
-    class ClassName {
-        +type attribute
-        +method() returnType
+    class Owner {
+        +str name
+        +list~Pet~ pets
+        +add_pet(pet) None
+        +get_pet(name) Pet
+        +list_pets() list~Pet~
+        +all_tasks() list~Task~
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Pet {
+        +str name
+        +str species
+        +list~Task~ tasks
+        +add_task(task) None
+        +list_tasks() list~Task~
+        +remove_task(task) None
     }
 
-    ClassName --> AnotherClass : relationship
+    class Task {
+        +str description
+        +str pet_name
+        +date due_date
+        +str due_time
+        +str frequency
+        +bool completed
+        +int priority
+        +mark_complete() None
+        +next_occurrence() Task
+        +__str__() str
+    }
+
+    class Scheduler {
+        +Owner owner
+        +sort_by_time(tasks) list~Task~
+        +todays_schedule() list~Task~
+        +filter_by_pet(name) list~Task~
+        +filter_by_status(completed) list~Task~
+        +detect_conflicts() list~str~
+        +mark_task_complete(task) Task
+        +sort_by_priority(tasks) list~Task~
+        +detect_overlaps(duration_minutes) list~str~
+        +next_available_slot(day, duration_minutes, day_start, day_end) str
+    }
+
+    class PersistenceAndFormatting {
+        <<module functions>>
+        +save_data(owner, path) None
+        +load_data(path) Owner
+        +format_schedule(tasks) str
+    }
+
+    Owner "1" o-- "*" Pet
+    Pet "1" o-- "*" Task
+    Scheduler ..> Owner : reads
+    PersistenceAndFormatting ..> Owner : saves/loads
+    PersistenceAndFormatting ..> Task : formats
