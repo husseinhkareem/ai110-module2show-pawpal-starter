@@ -2,8 +2,8 @@
 
 PawPal+ is a smart pet-care management system. It helps a busy pet owner plan care
 tasks (walks, feeding, meds, grooming, enrichment) across **multiple pets**, then uses
-scheduling logic to organize and prioritize those tasks into a clear daily plan — and
-explain the reasoning behind it.
+scheduling logic to organize and prioritize those tasks into a daily plan. It also tries
+to explain why it picked that plan.
 
 ## Scenario
 
@@ -22,22 +22,22 @@ via `main.py` and `pytest` before the Streamlit UI (`app.py`) is wired to it.
 |-------|----------------|
 | **`Task`** (`@dataclass`) | One care task: description, owning `pet_name`, `due_date` (a `date`), `due_time` (`"HH:MM"`), `frequency` (`once`/`daily`/`weekly`), `completed`, `priority` (1=high, 2=medium, 3=low). Knows how to `mark_complete()` and produce its `next_occurrence()`. |
 | **`Pet`** (`@dataclass`) | A pet (`name`, `species`) that owns a list of `Task`s; can `add_task`, `list_tasks`, `remove_task`. |
-| **`Owner`** | The user (`name`) who owns many `Pet`s. `all_tasks()` flattens every task across every pet — this aggregation is what makes the `Scheduler` genuinely **cross-pet**. |
+| **`Owner`** | The user (`name`) who owns many `Pet`s. `all_tasks()` flattens every task across every pet, and that is what lets the `Scheduler` work **across pets**. |
 | **`Scheduler`** | The behavior-heavy engine. Constructed with an `Owner` and reads through `owner.all_tasks()` to sort, filter, detect conflicts/overlaps, complete recurring tasks, and find open slots. |
 
 **Relationships:** `Owner "1" o-- "*" Pet`, `Pet "1" o-- "*" Task`, `Scheduler ..> Owner` (reads).
 
 ## Features
 
-- **Sort by time** — chronological ordering by `(due_date, due_time)`.
-- **Priority sorting** — high-priority tasks surface first via `(priority, due_date, due_time)`.
+- **Sort by time**: orders tasks by `(due_date, due_time)`.
+- **Priority sorting**: puts high-priority tasks first using `(priority, due_date, due_time)`.
 - **Filter by pet** and **filter by completion status**.
-- **Exact-time conflict detection** — flags incomplete tasks sharing the same date + time (across pets).
-- **Duration overlap detection** — flags incomplete tasks whose 30-minute blocks overlap even when start times differ.
-- **Daily/weekly recurrence** — completing a recurring task auto-generates the next occurrence.
-- **Next-available-slot** — finds the first free time block in the day.
-- **JSON persistence** — save/load the full owner→pets→tasks tree.
-- **tabulate + emoji formatting** — readable schedule grids with ✅/⬜ status.
+- **Exact-time conflict detection**: flags incomplete tasks that share the same date and time (across pets).
+- **Duration overlap detection**: flags incomplete tasks whose 30-minute blocks overlap even when the start times differ.
+- **Daily/weekly recurrence**: completing a recurring task makes the next one automatically.
+- **Next-available-slot**: finds the first free time block in the day.
+- **JSON persistence**: saves and loads the full owner, pets, and tasks tree.
+- **tabulate + emoji formatting**: schedule grids with ✅/⬜ status.
 
 ## Smarter Scheduling
 
@@ -176,19 +176,19 @@ tests/test_pawpal.py::test_conflict_detection PASSED                     [100%]
 ============================== 5 passed in 0.01s ===============================
 ```
 
-**Confidence Level: 5/5 ⭐** — every core scheduling behavior (completion, aggregation,
-sorting, recurrence, conflict detection) is exercised by a passing test, and the CLI demo
-runs the full feature set end-to-end without errors.
+**Confidence Level: 5/5 ⭐**. Every core scheduling behavior (completion, aggregation,
+sorting, recurrence, conflict detection) is covered by a passing test, and the CLI demo
+runs the whole feature set end to end without errors.
 
 ## 📸 Demo Walkthrough
 
 PawPal+ can be driven two ways: the Streamlit UI (`streamlit run app.py`) or the CLI (`python main.py`).
 
 **Streamlit UI features:**
-1. **Add a pet** — enter a name + species; the pet is added to the owner and saved to disk.
-2. **Schedule a task** — pick a pet, description, date, `HH:MM` time, frequency, and priority; it's attached to that pet and persisted.
-3. **Today's schedule** — toggle **By time / By priority**, and filter **by pet** or **by status**; the plan renders as a table.
-4. **Scheduling warnings** — conflicts and overlaps show as `st.warning`s, and the next free 30-minute slot appears in an info panel.
+1. **Add a pet**: enter a name and species. The pet gets added to the owner and saved to disk.
+2. **Schedule a task**: pick a pet, description, date, `HH:MM` time, frequency, and priority. It attaches to that pet and is saved.
+3. **Today's schedule**: toggle **By time / By priority**, and filter **by pet** or **by status**. The plan shows up as a table.
+4. **Scheduling warnings**: conflicts and overlaps show as `st.warning`s, and the next free 30-minute slot shows in an info panel.
 
 **Example workflow:** add pet *Buddy* (dog) → schedule *Morning walk* at 08:00 daily → view today's schedule → see it sorted alongside Max's tasks, with a 09:00 conflict warning and the next free slot at 09:30.
 
@@ -199,8 +199,8 @@ under **Running the demo** for the full run.
 
 ## 💾 Data Persistence
 
-State is stored as JSON in `pawpal_data.json`. `save_data(owner)` serializes the full
-owner → pets → tasks tree (dates encoded with `date.isoformat()`); `load_data()` reconstructs
+State is stored as JSON in `pawpal_data.json`. `save_data(owner)` writes the full
+owner, pets, and tasks tree to JSON (dates encoded with `date.isoformat()`); `load_data()` reconstructs
 it (parsing dates with `date.fromisoformat`) and returns `None` if the file doesn't exist yet.
 Both `pawpal_system.py` (the save/load functions) and `app.py` (which calls `load_data()` once
 into `st.session_state` and `save_data()` after every mutation) were built for this workflow, so
