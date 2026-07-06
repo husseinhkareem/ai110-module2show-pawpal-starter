@@ -64,11 +64,12 @@ day_start='08:00', day_end='20:00'); consider only incomplete tasks that day, tr
 
 **What each produced**
 
-Version A took no arguments. It sorted every task's `due_time`, took the hour of the last one,
-and returned that hour plus one. Version B took the full signature
-`next_available_slot(day=None, duration_minutes=30, day_start='08:00', day_end='20:00')`. It
-filtered to a single day, dropped completed tasks, walked forward from `day_start`, and returned
-the first gap of at least `duration_minutes`. If nothing fit, it returned a no-slot message.
+Version A took no arguments. It looked at the last task's time, kept just the hour and dropped
+the minutes, then added one. So 19:30 became 19, then 20:00. Version B took the full signature
+`next_available_slot(day=None, duration_minutes=30, day_start='08:00', day_end='20:00')`. It only
+looked at one day and threw out the completed tasks. Then it walked forward from `day_start` and
+returned the first gap big enough to fit `duration_minutes`. If nothing fit, it gave a no-slot
+message.
 
 **Real results from the three scenarios**
 
@@ -84,10 +85,10 @@ the first gap of at least `duration_minutes`. If nothing fit, it returned a no-s
 
 **Useful output from each**
 
-A is short and easy to read, and for a day with one task late in the afternoon it gives a slot
-that looks reasonable. B gave the answer I actually wanted every time. It stayed inside the
-working window and skipped tasks that were already done. It also wouldn't offer a gap smaller
-than `duration_minutes`.
+A is short and easy to read. For a day with one task late in the afternoon, the slot it gives
+looks reasonable. B gave the answer I wanted every time. It stayed inside the working window, and
+it left out tasks that were already done. It also wouldn't hand me a gap that was too small for
+`duration_minutes`.
 
 **Problems with each**
 
@@ -105,5 +106,5 @@ there's more to read and more to test.
 I'd keep Version B, and it's the one in `pawpal_system.py`. Across the three runs, A gave a wrong
 or unusable answer each time (`19:00` instead of `08:00`, a text string instead of a time, and
 `20:00` on a full day), while B matched what a planner should say. The comparison also showed me
-why prompt B's detail mattered. It spelled out the signature and the working window, so the model
-didn't have to guess. Prompt A left those open, and the guesses it made were wrong.
+why the detail in prompt B mattered. It spelled out the signature and the working window, so the
+model didn't have to guess. Prompt A left all that open, and it guessed wrong.
