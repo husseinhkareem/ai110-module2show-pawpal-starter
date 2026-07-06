@@ -1,13 +1,13 @@
 """PawPal+ logic layer: data models, scheduling algorithms, and JSON persistence.
 
-Skeleton phase: class shapes and method signatures only. Bodies raise
-NotImplementedError until the logic is implemented in later commits.
+Core data layer (Task, Pet, Owner) implemented. Scheduler algorithms and
+persistence are stubbed until later commits.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 
 
 PRIORITY_LABELS = {1: "high", 2: "medium", 3: "low"}
@@ -27,15 +27,30 @@ class Task:
 
     def mark_complete(self) -> None:
         """Mark this task as completed."""
-        raise NotImplementedError
+        self.completed = True
 
     def next_occurrence(self) -> "Task | None":
         """Return the next recurring Task, or None if this task is one-off."""
-        raise NotImplementedError
+        if self.frequency == "daily":
+            delta = timedelta(days=1)
+        elif self.frequency == "weekly":
+            delta = timedelta(days=7)
+        else:
+            return None
+        return Task(
+            description=self.description,
+            pet_name=self.pet_name,
+            due_date=self.due_date + delta,
+            due_time=self.due_time,
+            frequency=self.frequency,
+            completed=False,
+            priority=self.priority,
+        )
 
     def __str__(self) -> str:
         """Readable one-line summary of the task."""
-        raise NotImplementedError
+        status = "✅" if self.completed else "⬜"
+        return f"⏰ {self.due_time} | {self.pet_name} | {self.description} | {self.frequency} | {status}"
 
 
 @dataclass
@@ -48,15 +63,16 @@ class Pet:
 
     def add_task(self, task: Task) -> None:
         """Append a task to this pet's task list."""
-        raise NotImplementedError
+        self.tasks.append(task)
 
     def list_tasks(self) -> list[Task]:
         """Return this pet's tasks."""
-        raise NotImplementedError
+        return self.tasks
 
     def remove_task(self, task: Task) -> None:
         """Remove a task from this pet if present."""
-        raise NotImplementedError
+        if task in self.tasks:
+            self.tasks.remove(task)
 
 
 class Owner:
@@ -69,19 +85,25 @@ class Owner:
 
     def add_pet(self, pet: Pet) -> None:
         """Add a pet to this owner."""
-        raise NotImplementedError
+        self.pets.append(pet)
 
     def get_pet(self, name: str) -> "Pet | None":
         """Return the pet with the given name, or None."""
-        raise NotImplementedError
+        for pet in self.pets:
+            if pet.name == name:
+                return pet
+        return None
 
     def list_pets(self) -> list[Pet]:
         """Return all pets."""
-        raise NotImplementedError
+        return self.pets
 
     def all_tasks(self) -> list[Task]:
         """Return a flat list of every task across every pet (cross-pet aggregation)."""
-        raise NotImplementedError
+        tasks: list[Task] = []
+        for pet in self.pets:
+            tasks.extend(pet.tasks)
+        return tasks
 
 
 class Scheduler:
