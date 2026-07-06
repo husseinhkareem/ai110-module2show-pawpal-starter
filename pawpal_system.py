@@ -1,7 +1,7 @@
 """PawPal+ logic layer: data models, scheduling algorithms, and JSON persistence.
 
-Core data layer (Task, Pet, Owner) implemented. Scheduler algorithms and
-persistence are stubbed until later commits.
+Scheduling algorithms implemented (sort/filter/conflict/overlap/recurrence).
+Priority sort, next-available-slot, persistence, and formatting land next.
 """
 
 from __future__ import annotations
@@ -11,6 +11,12 @@ from datetime import date, timedelta
 
 
 PRIORITY_LABELS = {1: "high", 2: "medium", 3: "low"}
+
+
+def _time_to_minutes(hhmm: str) -> int:
+    """Convert an 'HH:MM' string to minutes since midnight."""
+    hours, minutes = hhmm.split(":")
+    return int(hours) * 60 + int(minutes)
 
 
 @dataclass
@@ -115,34 +121,70 @@ class Scheduler:
 
     def sort_by_time(self, tasks: "list[Task] | None" = None) -> list[Task]:
         """Return tasks sorted by (due_date, due_time); defaults to all tasks."""
-        raise NotImplementedError
+        if tasks is None:
+            tasks = self.owner.all_tasks()
+        return sorted(tasks, key=lambda t: (t.due_date, t.due_time))
 
     def todays_schedule(self) -> list[Task]:
         """Return today's tasks sorted by time."""
-        raise NotImplementedError
+        today = date.today()
+        todays = [t for t in self.owner.all_tasks() if t.due_date == today]
+        return self.sort_by_time(todays)
 
     def filter_by_pet(self, name: str) -> list[Task]:
         """Return all tasks belonging to the named pet."""
-        raise NotImplementedError
+        return [t for t in self.owner.all_tasks() if t.pet_name == name]
 
     def filter_by_status(self, completed: bool) -> list[Task]:
         """Return all tasks matching the given completion state."""
-        raise NotImplementedError
+        return [t for t in self.owner.all_tasks() if t.completed == completed]
 
     def detect_conflicts(self) -> list[str]:
-        """Warn about incomplete tasks sharing the same date and time."""
-        raise NotImplementedError
+        """Warn about incomplete tasks sharing the same date and time (across all pets)."""
+        groups: dict[tuple, list[Task]] = {}
+        for t in self.owner.all_tasks():
+            if t.completed:
+                continue
+            groups.setdefault((t.due_date, t.due_time), []).append(t)
+        warnings: list[str] = []
+        for (due, tm), group in groups.items():
+            if len(group) >= 2:
+                names = " & ".join(f"{t.pet_name} ({t.description})" for t in group)
+                warnings.append(f"⚠️ Conflict at {tm} on {due.isoformat()}: {names}")
+        return warnings
 
     def mark_task_complete(self, task: Task) -> "Task | None":
         """Complete a task; if recurring, generate and attach the next occurrence."""
-        raise NotImplementedError
+        task.mark_complete()
+        next_task = task.next_occurrence()
+        if next_task is None:
+            return None
+        pet = self.owner.get_pet(task.pet_name)
+        if pet is not None:
+            pet.add_task(next_task)
+        return next_task
+
+    def detect_overlaps(self, duration_minutes: int = 30) -> list[str]:
+        """Warn about incomplete tasks whose [start, start+duration] blocks overlap."""
+        incomplete = [t for t in self.owner.all_tasks() if not t.completed]
+        warnings: list[str] = []
+        for i in range(len(incomplete)):
+            for j in range(i + 1, len(incomplete)):
+                a, b = incomplete[i], incomplete[j]
+                if a.due_date != b.due_date:
+                    continue
+                a_start = _time_to_minutes(a.due_time)
+                b_start = _time_to_minutes(b.due_time)
+                if a_start < b_start + duration_minutes and b_start < a_start + duration_minutes:
+                    warnings.append(
+                        f"⚠️ Overlap on {a.due_date.isoformat()}: "
+                        f"{a.pet_name} ({a.description}) at {a.due_time} "
+                        f"overlaps {b.pet_name} ({b.description}) at {b.due_time}"
+                    )
+        return warnings
 
     def sort_by_priority(self, tasks: "list[Task] | None" = None) -> list[Task]:
         """Return tasks sorted by (priority, due_date, due_time)."""
-        raise NotImplementedError
-
-    def detect_overlaps(self, duration_minutes: int = 30) -> list[str]:
-        """Warn about incomplete tasks whose duration blocks overlap."""
         raise NotImplementedError
 
     def next_available_slot(
