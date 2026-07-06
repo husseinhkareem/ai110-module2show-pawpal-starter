@@ -6,8 +6,14 @@ Priority sort, next-available-slot, persistence, and formatting land next.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+
+try:
+    from tabulate import tabulate
+except ImportError:  # keep logic importable even if tabulate is missing
+    tabulate = None
 
 
 PRIORITY_LABELS = {1: "high", 2: "medium", 3: "low"}
@@ -17,6 +23,11 @@ def _time_to_minutes(hhmm: str) -> int:
     """Convert an 'HH:MM' string to minutes since midnight."""
     hours, minutes = hhmm.split(":")
     return int(hours) * 60 + int(minutes)
+
+
+def _minutes_to_time(total: int) -> str:
+    """Convert minutes since midnight back to an 'HH:MM' string."""
+    return f"{total // 60:02d}:{total % 60:02d}"
 
 
 @dataclass
@@ -184,8 +195,10 @@ class Scheduler:
         return warnings
 
     def sort_by_priority(self, tasks: "list[Task] | None" = None) -> list[Task]:
-        """Return tasks sorted by (priority, due_date, due_time)."""
-        raise NotImplementedError
+        """Return tasks sorted by (priority, due_date, due_time) so high priority surfaces first."""
+        if tasks is None:
+            tasks = self.owner.all_tasks()
+        return sorted(tasks, key=lambda t: (t.priority, t.due_date, t.due_time))
 
     def next_available_slot(
         self,
@@ -195,19 +208,102 @@ class Scheduler:
         day_end: str = "20:00",
     ) -> str:
         """Return the first free HH:MM start that fits duration, or a no-slot message."""
-        raise NotImplementedError
+        if day is None:
+            day = date.today()
+        blocks: list[tuple[int, int]] = []
+        for t in self.owner.all_tasks():
+            if t.completed or t.due_date != day:
+                continue
+            start = _time_to_minutes(t.due_time)
+            blocks.append((start, start + duration_minutes))
+        blocks.sort()
+        cursor = _time_to_minutes(day_start)
+        end_limit = _time_to_minutes(day_end)
+        for block_start, block_end in blocks:
+            if block_start - cursor >= duration_minutes:
+                return _minutes_to_time(cursor)
+            cursor = max(cursor, block_end)
+        if end_limit - cursor >= duration_minutes:
+            return _minutes_to_time(cursor)
+        return f"No {duration_minutes}-minute slot available on {day.isoformat()} before {day_end}"
 
 
 def save_data(owner: Owner, path: str = "pawpal_data.json") -> None:
     """Serialize an owner (with pets and tasks) to JSON on disk."""
-    raise NotImplementedError
+    data = {
+        "name": owner.name,
+        "pets": [
+            {
+                "name": pet.name,
+                "species": pet.species,
+                "tasks": [
+                    {
+                        "description": t.description,
+                        "pet_name": t.pet_name,
+                        "due_date": t.due_date.isoformat(),
+                        "due_time": t.due_time,
+                        "frequency": t.frequency,
+                        "completed": t.completed,
+                        "priority": t.priority,
+                    }
+                    for t in pet.tasks
+                ],
+            }
+            for pet in owner.pets
+        ],
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2)
 
 
 def load_data(path: str = "pawpal_data.json") -> "Owner | None":
     """Load an owner from JSON, or return None if the file is missing."""
-    raise NotImplementedError
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        return None
+    owner = Owner(data["name"], [])
+    for pet_data in data.get("pets", []):
+        pet = Pet(pet_data["name"], pet_data["species"], [])
+        for t in pet_data.get("tasks", []):
+            pet.add_task(
+                Task(
+                    description=t["description"],
+                    pet_name=t["pet_name"],
+                    due_date=date.fromisoformat(t["due_date"]),
+                    due_time=t["due_time"],
+                    frequency=t.get("frequency", "once"),
+                    completed=t.get("completed", False),
+                    priority=t.get("priority", 2),
+                )
+            )
+        owner.add_pet(pet)
+    return owner
 
 
 def format_schedule(tasks: list[Task]) -> str:
-    """Return a tabulate grid of tasks (Time, Pet, Task, Freq, Priority, Done)."""
-    raise NotImplementedError
+    """Return a tabulate grid of tasks (Time, Pet, Task, Freq, Priority, Done).
+
+    Renders tasks in the order given (does not re-sort), so priority-sorted or
+    time-sorted callers keep their ordering.
+    """
+    headers = ["Time", "Pet", "Task", "Freq", "Priority", "Done"]
+    rows = [
+        [
+            t.due_time,
+            t.pet_name,
+            t.description,
+            t.frequency,
+            PRIORITY_LABELS.get(t.priority, str(t.priority)),
+            "✅" if t.completed else "⬜",
+        ]
+        for t in tasks
+    ]
+    if not rows:
+        return "(no tasks)"
+    if tabulate is None:  # graceful fallback if tabulate is unavailable
+        lines = [" | ".join(headers)]
+        lines += [" | ".join(str(c) for c in r) for r in rows]
+        return "\n".join(lines)
+    return tabulate(rows, headers=headers, tablefmt="github")
