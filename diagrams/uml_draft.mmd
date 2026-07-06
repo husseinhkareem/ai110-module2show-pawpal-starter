@@ -1,0 +1,47 @@
+classDiagram
+    %% PawPal+ Phase 1 draft: core four classes and core methods.
+
+    class Owner {
+        +str name
+        +list~Pet~ pets
+        +add_pet(pet) None
+        +get_pet(name) Pet
+        +list_pets() list~Pet~
+        +all_tasks() list~Task~
+    }
+
+    class Pet {
+        +str name
+        +str species
+        +list~Task~ tasks
+        +add_task(task) None
+        +list_tasks() list~Task~
+        +remove_task(task) None
+    }
+
+    class Task {
+        +str description
+        +str pet_name
+        +date due_date
+        +str due_time
+        +str frequency
+        +bool completed
+        +int priority
+        +mark_complete() None
+        +next_occurrence() Task
+        +__str__() str
+    }
+
+    class Scheduler {
+        +Owner owner
+        +sort_by_time(tasks) list~Task~
+        +todays_schedule() list~Task~
+        +filter_by_pet(name) list~Task~
+        +filter_by_status(completed) list~Task~
+        +detect_conflicts() list~str~
+        +mark_task_complete(task) Task
+    }
+
+    Owner "1" o-- "*" Pet
+    Pet "1" o-- "*" Task
+    Scheduler ..> Owner : reads
